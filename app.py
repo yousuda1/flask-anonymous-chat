@@ -2,11 +2,16 @@ from flask import Flask, render_template, request, redirect, session, url_for
 from flask_socketio import SocketIO
 import random
 import string
+import os
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "mysecretkey"
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="eventlet"
+)
 
 
 def generate_guest_name():
@@ -31,16 +36,17 @@ def index():
 @app.route("/chat")
 def chat():
     username = session.get("username")
+
     if not username:
-        return redirect(url_for("index"))
+        username = "hi"
+        session["username"] = username
 
     return render_template("chat.html", username=username)
 
 
 @socketio.on("join_chat")
 def handle_join(data):
-    username = data["username"]
-    print(f"{username} joined")
+    username = data.get("username", "Guest")
 
     socketio.emit("chat_message", {
         "username": "System",
@@ -50,18 +56,23 @@ def handle_join(data):
 
 @socketio.on("send_chat_message")
 def handle_send_message(data):
-    print("Message received:", data)
+    username = data.get("username", "Guest")
+    text = data.get("text", "").strip()
+
+    if not text:
+        return
+
+    print("Message received:", {"username": username, "text": text})
 
     socketio.emit("chat_message", {
-        "username": data["username"],
-        "text": data["text"]
+        "username": username,
+        "text": text
     })
 
 
 @socketio.on("leave_chat")
 def handle_leave(data):
-    username = data["username"]
-    print(f"{username} left")
+    username = data.get("username", "Guest")
 
     socketio.emit("chat_message", {
         "username": "System",
@@ -69,8 +80,6 @@ def handle_leave(data):
     })
 
 
-import os
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port, debug=True)

@@ -24,17 +24,17 @@
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-        const socket = io("http://127.0.0.1:5000");
-        const username = "{{ username }}";
+        const socket = io(window.location.origin, {
+            transports: ["polling", "websocket"]
+        });
 
+        const username = "{{ username }}";
         const messagesDiv = document.getElementById("messages");
         const messageInput = document.getElementById("messageInput");
         const sendBtn = document.getElementById("sendBtn");
         const statusText = document.getElementById("status");
 
         function addMessage(data) {
-            console.log("Browser received:", data);
-
             const msg = document.createElement("div");
             msg.className = "message";
             msg.innerHTML = "<strong>" + data.username + ":</strong> " + data.text;
@@ -48,8 +48,13 @@
             socket.emit("join_chat", { username: username });
         });
 
+        socket.on("connect_error", function (err) {
+            console.log("Connect error:", err);
+            statusText.textContent = "Connection failed";
+        });
+
         socket.on("disconnect", function () {
-            console.log("Disconnected from server");
+            console.log("Disconnected");
             statusText.textContent = "Disconnected";
         });
 
@@ -61,8 +66,6 @@
             const text = messageInput.value.trim();
 
             if (text !== "") {
-                console.log("Sending:", text);
-
                 socket.emit("send_chat_message", {
                     username: username,
                     text: text
